@@ -8,6 +8,5 @@ Use your WASD buttons to control your hero, where W - UP, S - DOWN, A - LEFT, D 
 
 Number (your hero model) displays the total number of mines around your hero (including the vertex units)
 
-You can also try to find the cheat button on your keyboard in this game.
-
+<b>You can also try to find the cheat button on your keyboard in this game.</b>
 

@@ -4,36 +4,11 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
 namespace Game1
 {
-    static class Numbers
-    {
-        static private Texture2D[] Textures;
-
-        static public Texture2D GetTexture(int number)
-        {
-            return Textures[number];
-        }
-
-        static public void SetTextures(params Texture2D[] texture2s)
-        {
-            Textures = texture2s;
-        }
-    }
-
-    class Point
-    {
-        public int X { get; set; }
-        public int Y { get; set; }
-
-        public Point(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
-    }
-
     abstract class Entity : IComparable
     {
         public Point Position { get; set; }
@@ -63,7 +38,6 @@ namespace Game1
         }
     }
 
-
     class Bomb : Entity
     {
         public Bomb(int x, int y) : base(x, y) { }
@@ -85,11 +59,9 @@ namespace Game1
 
         public void TakeDefuseKit(ref DefuseKit Kits)
         {
-            System.Diagnostics.Debug.WriteLine("TakeDefuseKit method, HasDefuseKit = " + HasDefuseKit);
             HasDefuseKit = true;
             Kits = null;
         }
-
     }
 
     class DefuseKit : Entity
@@ -115,24 +87,24 @@ namespace Game1
 
             foreach (Keys key in keys)
             {
-                if (!forbidden.Contains('w') && key == Keys.W)
+                if (!forbidden.Contains('w') && (key == Keys.W || key == Keys.Up))
                 {
-                    Position.Y -= speed;
+                    Position -= new Point(x: 0, y: speed);
                     return true;
                 }
-                if (!forbidden.Contains('a') && key == Keys.A)
+                if (!forbidden.Contains('a') && (key == Keys.A || key == Keys.Left))
                 {
-                    Position.X -= speed;
+                    Position -= new Point(x: speed, y: 0);
                     return true;
                 }
-                if (!forbidden.Contains('s') && key == Keys.S)
+                if (!forbidden.Contains('s') && (key == Keys.S || key == Keys.Down))
                 {
-                    Position.Y += speed;
+                    Position += new Point(x: 0, y: speed);
                     return true;
                 }
-                if (!forbidden.Contains('d') && key == Keys.D)
+                if (!forbidden.Contains('d') && (key == Keys.D || key == Keys.Right))
                 {
-                    Position.X += speed;
+                    Position += new Point(x: speed, y: 0);
                     return true;
                 }
             }
@@ -140,34 +112,36 @@ namespace Game1
         }
     }
 
+    enum GameState
+    {
+        MainMenu,
+        Gameplay,
+        EndOfGame
+    }
+
     public class Game1 : Game
     {
-        enum GameState
-        {
-            MainMenu,
-            Gameplay,
-            EndOfGame
-        }
+        const int fontSize = 20;
+        const int PointSize = 30;
+
         GameState _state;
         bool CheatMode = false;
 
         GraphicsDeviceManager graphics;
 
-        Texture2D whitesprite;
         Texture2D KitImage;
-        Texture2D Menu;
+        Texture2D whiteSquare;
 
         SpriteBatch sprite;
-        //SpriteFont font; // Verdana 20
+        SpriteFont font; // Verdana 20
 
-        readonly int PointSize = 30;
         readonly int Width;
         readonly int Height;
 
         Player_CT player;
         DefuseKit Kits;
         Bomb[] Bombs;
-        LinkedList<Point> Path;
+        List<Point> Path;
         KeyboardState previous;
 
         bool SameKeyboardStates { get; set; }
@@ -225,10 +199,15 @@ namespace Game1
         private bool AreKeyboardStatesTheSame(KeyboardState previous, KeyboardState current)
         {
             return
-            (previous.IsKeyDown(Keys.W) == current.IsKeyDown(Keys.W) && current.IsKeyDown(Keys.W) != false)
-                   || (previous.IsKeyDown(Keys.A) == current.IsKeyDown(Keys.A) && current.IsKeyDown(Keys.A) != false)
-                   || (previous.IsKeyDown(Keys.S) == current.IsKeyDown(Keys.S) && current.IsKeyDown(Keys.S) != false)
-                   || (previous.IsKeyDown(Keys.D) == current.IsKeyDown(Keys.D) && current.IsKeyDown(Keys.D) != false);
+                previous.IsKeyDown(Keys.W) && current.IsKeyDown(Keys.W) ||
+                previous.IsKeyDown(Keys.A) && current.IsKeyDown(Keys.A) ||
+                previous.IsKeyDown(Keys.S) && current.IsKeyDown(Keys.S) ||
+                previous.IsKeyDown(Keys.D) && current.IsKeyDown(Keys.D) ||
+                
+                previous.IsKeyDown(Keys.Up) && current.IsKeyDown(Keys.Up) ||
+                previous.IsKeyDown(Keys.Down) && current.IsKeyDown(Keys.Down) ||
+                previous.IsKeyDown(Keys.Left) && current.IsKeyDown(Keys.Left) ||
+                previous.IsKeyDown(Keys.Right) && current.IsKeyDown(Keys.Right);
         }
 
         private void InitializeEntities()
@@ -273,41 +252,58 @@ namespace Game1
             Array.Sort(Bombs);
         }
 
+        public static Texture2D CreateTexture(GraphicsDevice device, int width, int height, Func<int, Color> paint)
+        {
+            //initialize a texture
+            Texture2D texture = new Texture2D(device, width, height);
+
+            //the array holds the color for each pixel in the texture
+            Color[] data = new Color[width * height];
+            for (int pixel = 0; pixel < data.Length; pixel++)
+            {
+                //the function applies the color according to the specified pixel
+                data[pixel] = paint(pixel);
+            }
+
+            //set the color
+            texture.SetData(data);
+
+            return texture;
+        }
+
         protected override void Initialize()
         {
             Window.Title = "Mined Out";
 
             InitializeEntities();
 
-            Path = new LinkedList<Point>();
+            Path = new List<Point>();
             Steps = 0;
+
+            const int sideSize = 30;
+
+            whiteSquare = CreateTexture(GraphicsDevice, sideSize, sideSize, t => Color.White);
 
             base.Initialize();
         }
 
         protected override void LoadContent()
         {
-            whitesprite = Content.Load<Texture2D>("white1x1");
             KitImage = Content.Load<Texture2D>("DefuseKit");
-            Menu = Content.Load<Texture2D>("PressEnterToContinue");
             sprite = new SpriteBatch(GraphicsDevice);
 
-            {
-                Texture2D[] numbers = new Texture2D[9];
-
-                for (int i = 0; i < 9; i++)
-                {
-                    numbers[i] = Content.Load<Texture2D>($@"numbers\{i}");
-                }
-                Numbers.SetTextures(numbers);
-            }
-
+            font = Content.Load<SpriteFont>("font");
         }
 
 
         protected override void UnloadContent()
         {
+            KitImage = null;
+            sprite = null;
 
+            Content.Unload();
+
+            base.UnloadContent();
         }
 
         protected void ResetGame()
@@ -340,20 +336,26 @@ namespace Game1
         {
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
+
             if (Keyboard.GetState().IsKeyDown(Keys.C)) // Easter Egg =D
-                CheatMode = !CheatMode;
+                CheatMode = true;
+            else
+                CheatMode = false;
 
             Point point = new Point(player.Position.X, player.Position.Y);
-            if (!Path.Contains(point))
-                Path.AddLast(point);
 
+            if (!Path.AnyReversed(point))
+                Path.Add(point);
+
+            Debug.WriteLine(Path.Count);
 
             if (previous == null)
             {
                 previous = Keyboard.GetState();
                 SameKeyboardStates = false;
             }
-            if (!(SameKeyboardStates = AreKeyboardStatesTheSame(previous, Keyboard.GetState()) ))
+
+            if (!(SameKeyboardStates = AreKeyboardStatesTheSame(previous, Keyboard.GetState())))
             {
                 previous = Keyboard.GetState();
             }
@@ -404,19 +406,33 @@ namespace Game1
 
         protected void DrawMainMenu(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.DeepSkyBlue);
+            const string text = "Press enter to start the game";
+
+            var coords = new Vector2(
+                graphics.PreferredBackBufferWidth / 2 - text.Length * fontSize / 2.85f,
+                graphics.PreferredBackBufferHeight / 2
+            );
+
+            GraphicsDevice.Clear(Color.ForestGreen);
 
             sprite.Begin(SpriteSortMode.BackToFront);
-            sprite.Draw(Menu, new Vector2(0, 0), Color.White);
+            sprite.DrawString(font, text, coords, Color.DarkGray);
             sprite.End();
         }
 
         protected void DrawEndOfGame(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.DeepSkyBlue);
+            const string text = "Press enter to restart the game";
+
+            var coords = new Vector2(
+                graphics.PreferredBackBufferWidth / 2 - text.Length * fontSize / 2.85f,
+                graphics.PreferredBackBufferHeight / 2
+            );
+
+            GraphicsDevice.Clear(Color.ForestGreen);
 
             sprite.Begin(SpriteSortMode.BackToFront);
-            sprite.Draw(Menu, new Vector2(0, 0), Color.White);
+            sprite.DrawString(font, text, coords, Color.DarkGray);
             sprite.End();
         }
 
@@ -425,39 +441,54 @@ namespace Game1
             GraphicsDevice.Clear(Color.DeepSkyBlue);
             sprite.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend);
 
-            sprite.Draw(whitesprite, new Vector2(Width / 2, 0),
-                null, Color.Orange, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
+            sprite.Draw(whiteSquare, new Vector2(Width / 2, 0),
+                null, Color.Orange, 0, Vector2.Zero, 1, SpriteEffects.None, 1); // draw player square
 
             if (CheatMode)
                 foreach (Bomb bomb in Bombs)
                 {
                     if (bomb != null)
-                        sprite.Draw(whitesprite, new Vector2(bomb.Position.X, bomb.Position.Y),
-                            null, Color.Red, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
+                        sprite.Draw(whiteSquare, new Vector2(bomb.Position.X, bomb.Position.Y),
+                            null, Color.Red, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
                 }
 
+            // draw walls
             for (int i = 0; i < Width / PointSize; i++)
             {
                 if (i * PointSize != Width / 2)
-                    sprite.Draw(whitesprite, new Vector2(i * PointSize, 0), null,
-                        Color.Green, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
+                    sprite.Draw(whiteSquare, new Vector2(i * PointSize, 0), null,
+                        Color.Green, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
 
-                sprite.Draw(whitesprite, new Vector2(0, i * PointSize),
-                    null, Color.Green, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
-                sprite.Draw(whitesprite, new Vector2(Width - PointSize, i * PointSize),
-                    null, Color.Green, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
+                sprite.Draw(whiteSquare, new Vector2(0, i * PointSize),
+                    null, Color.Green, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
+                sprite.Draw(whiteSquare, new Vector2(Width - PointSize, i * PointSize),
+                    null, Color.Green, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
             }
 
+            // draw kit image
             if (Kits != null)
                 sprite.Draw(KitImage, new Vector2(Kits.Position.X, Kits.Position.Y), Color.White);
 
-            sprite.Draw(Numbers.GetTexture(BombsNearTo(player.Position.X, player.Position.Y)),
-                new Vector2(player.Position.X, player.Position.Y), Color.Purple);
+            // draw amount of bombs nearby
+            {
+                const float coordsToAddY = -((PointSize / 2) - 13.4f);
+                const float coordsToAddX = (PointSize / 2) - 8f;
+
+                var position = 
+                    new Vector2(player.Position.X, player.Position.Y) + new Vector2(coordsToAddX, coordsToAddY);
+
+                sprite.DrawString(
+                    font, 
+                    BombsNearTo(player.Position.X, player.Position.Y).ToString(),
+                    position, 
+                    Color.Purple
+               );
+            }
 
             foreach (Point path in Path)
             {
-                sprite.Draw(whitesprite, new Vector2(path.X, path.Y),
-                    null, Color.Black, 0, Vector2.Zero, PointSize, SpriteEffects.None, 1);
+                sprite.Draw(whiteSquare, new Vector2(path.X, path.Y),
+                    null, Color.Black, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
             }
 
             sprite.End();

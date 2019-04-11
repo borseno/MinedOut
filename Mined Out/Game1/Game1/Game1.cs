@@ -500,9 +500,12 @@ namespace Game1
             GraphicsDevice.Clear(Color.Black);
             sprite.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend);
 
+            var bombsNear = BombsNearTo(player.Position.X, player.Position.Y);
+            var endPoint = new Vector2(width / 2, 0);
+
             #region draw end point
             {
-                sprite.Draw(whiteSquare, new Vector2(width / 2, 0),
+                sprite.Draw(whiteSquare, endPoint,
                     null, Color.Orange, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
             }
             #endregion
@@ -552,7 +555,7 @@ namespace Game1
 
                 sprite.DrawString(
                     font,
-                    BombsNearTo(player.Position.X, player.Position.Y).ToString(),
+                    bombsNear.ToString(),
                     position,
                     Color.Purple
                );
@@ -564,6 +567,33 @@ namespace Game1
             {
                 sprite.Draw(whiteSquare, new Vector2(path.X, path.Y),
                     null, Color.White, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
+            }
+            #endregion
+
+            #region draw steps, bombs nearby, distance to end
+            {
+                const string bombsText = "Bombs nearby:";
+                const string stepsText = "Steps:";
+                const string distanceEndText = "Distance:";
+
+                var rightTop = new Vector2(width - pointSize, 0);
+                var leftTop = new Vector2(pointSize, 0);
+
+                var moreLeftRightTop = new Vector2(rightTop.X - (bombsText.Length * 1.0f) * fontSize, rightTop.Y);
+                var moreRightLeftTop = new Vector2(leftTop.X + (stepsText.Length * 1.3f) * fontSize, leftTop.Y);
+
+                var distanceX = Math.Abs((player.Position.X - endPoint.X) / 30);
+                var distanceY = Math.Abs((player.Position.Y - endPoint.Y) / 30);
+
+                var distance = distanceX + distanceY;
+
+                // steps
+                sprite.DrawString(font, $"{stepsText} {steps}", leftTop, Color.CadetBlue);
+
+                // bombs nearby
+                sprite.DrawString(font, $"{bombsText} {bombsNear}", moreLeftRightTop, Color.CadetBlue);
+
+                sprite.DrawString(font, $"{distanceEndText} {Math.Round(distance)} ", moreRightLeftTop, Color.CadetBlue);
             }
             #endregion
 

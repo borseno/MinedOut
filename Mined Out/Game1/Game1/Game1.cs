@@ -27,7 +27,22 @@ namespace Game1
                 else
                     return this.Position.X - entity.Position.X;
             }
-            throw new InvalidCastException();
+            else
+            {
+#if DEBUG
+
+                Debug.WriteLine(
+                    $"Error in {this.GetType().Name}.CompareTo({i.GetType().Name}) {Environment.NewLine}" +
+                    $"Invalid cast has been detected");
+
+                throw new InvalidCastException();
+
+#else
+
+                throw new InvalidCastException("Entity is not " + i.GetType().Name);
+                
+#endif
+            }
         }
 
         public override string ToString()
@@ -70,7 +85,7 @@ namespace Game1
         {
         }
 
-        public bool Move(KeyboardState state, LinkedList<char> forbidden, int speed)
+        public bool Move(KeyboardState state, IEnumerable<char> forbidden, int speed)
         {
             Keys[] keys = state.GetPressedKeys();
 
@@ -113,37 +128,29 @@ namespace Game1
         const int fontSize = 20;
         const int pointSize = 30;
 
-        GameState _state;
-        bool cheatMode = false;
         readonly GraphicsDeviceManager graphics;
+        readonly Random rnd;
+        readonly int width;
+        readonly int height;
+
+        GameState _state;
+        KeyboardState previous;
+
+        bool cheatMode;
+        int steps;
 
         Texture2D kitImage;
         Texture2D whiteSquare;
-
         SpriteBatch sprite;
         SpriteFont font; // Verdana 20
-
-        readonly int width;
-        readonly int height;
-        readonly Random rnd;
 
         Player_CT player;
         DefuseKit kits;
         Bomb[] bombs;
+
         List<Point> path;
-        KeyboardState previous;
 
-        int steps;
-
-        bool sameKeyboardStates;
-
-        bool HaveWon
-        {
-            get
-            {
-                return player.Position.X == width / 2 && player.Position.Y == 0;
-            }
-        }
+        bool HaveWon => player.Position.X == width / 2 && player.Position.Y == 0;
 
         public Game1()
         {
@@ -160,20 +167,25 @@ namespace Game1
             height = graphics.PreferredBackBufferHeight;
 
             rnd = new Random();
+
+            Window.Title = "Mined Out";
         }
 
         int BombsNearToLinear(int x, int y)
         {
             int count = 0;
+
             for (int i = 0; i < bombs.Length; i++)
             {
                 if (bombs[i] == null)
                     continue;
+
                 if (Math.Abs(x - bombs[i].Position.X) <= pointSize &&
                     Math.Abs(y - bombs[i].Position.Y) <= pointSize &&
                     (x != bombs[i].Position.X || y != bombs[i].Position.Y))
                     count++;
             }
+
             return count;
         }
 
@@ -226,17 +238,17 @@ namespace Game1
                 return BombsNearToBinary(x, y);
         }
 
-        public LinkedList<char> ForbiddenDirect() // can't move through the walls
+        public IEnumerable<char> ForbiddenDirect() // can't move through the walls
         {
-            LinkedList<char> forbidden = new LinkedList<char>();
+            var forbidden = new List<char>(4);
             if (player.Position.X == pointSize)
-                forbidden.AddLast('a');
+                forbidden.Add('a');
             if (player.Position.Y == pointSize && player.Position.X != width / 2)
-                forbidden.AddLast('w');
+                forbidden.Add('w');
             if (height - pointSize == player.Position.Y)
-                forbidden.AddLast('s');
+                forbidden.Add('s');
             if (width - pointSize * 2 == player.Position.X)
-                forbidden.AddLast('d');
+                forbidden.Add('d');
             return forbidden;
         }
 
@@ -271,8 +283,7 @@ namespace Game1
         {
             do
             {
-                player =
-                    new Player_CT(
+                player = new Player_CT(
                         rnd.Next(1, (width - pointSize) / pointSize) * pointSize,
                         height - pointSize
                         );
@@ -281,7 +292,10 @@ namespace Game1
 
         private void InitBombs()
         {
-            int length = rnd.Next(100, 200);
+            int min = 100 * 30 / pointSize;
+            int max = 200 * 30 / pointSize;
+
+            int length = rnd.Next(min, max);
             bombs = new Bomb[length];
 
             for (int last = 0; last < length;)
@@ -303,6 +317,7 @@ namespace Game1
                     last++;
                 }
             }
+
             Array.Sort(bombs);
         }
 
@@ -339,16 +354,12 @@ namespace Game1
 
         protected override void Initialize()
         {
-            Window.Title = "Mined Out";
+            path = new List<Point>(84);
+            steps = 0;
+            cheatMode = false;
+            whiteSquare = CreateTexture(GraphicsDevice, pointSize, pointSize, t => Color.White);
 
             InitializeEntities();
-
-            path = new List<Point>();
-            steps = 0;
-
-            const int sideSize = 30;
-
-            whiteSquare = CreateTexture(GraphicsDevice, sideSize, sideSize, t => Color.White);
 
             base.Initialize();
         }
@@ -366,6 +377,9 @@ namespace Game1
             kitImage = null;
             sprite = null;
 
+            whiteSquare?.Dispose();
+            whiteSquare = null;
+
             Content.Unload();
 
             base.UnloadContent();
@@ -380,6 +394,7 @@ namespace Game1
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
+
             if (Keyboard.GetState().IsKeyDown(Keys.Enter))
             {
                 _state = GameState.Gameplay;
@@ -390,6 +405,7 @@ namespace Game1
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
+
             if (Keyboard.GetState().IsKeyDown(Keys.Enter))
             {
                 _state = GameState.Gameplay;
@@ -411,19 +427,15 @@ namespace Game1
                 path.Add(player.Position);
 
             if (previous == null)
-            {
                 previous = Keyboard.GetState();
-                sameKeyboardStates = false;
-            }
 
-            if (!(sameKeyboardStates = AreKeyboardStatesTheSame(previous, Keyboard.GetState())))
-            {
-                previous = Keyboard.GetState();
-            }
 
-            if (!sameKeyboardStates)
+            if (!AreKeyboardStatesTheSame(previous, Keyboard.GetState()))
             {
-                if (player.Move(Keyboard.GetState(), ForbiddenDirect(), pointSize))
+                var current = Keyboard.GetState();
+                previous = current;
+
+                if (player.Move(current, ForbiddenDirect(), pointSize))
                     steps++;
 
                 if (kits != null && player.Position == kits.Position)
@@ -497,11 +509,11 @@ namespace Game1
 
         protected void DrawGamePlay()
         {
-            GraphicsDevice.Clear(Color.Black);
-            sprite.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend);
-
             var bombsNear = BombsNearTo(player.Position.X, player.Position.Y);
             var endPoint = new Vector2(width / 2, 0);
+
+            GraphicsDevice.Clear(Color.Black);
+            sprite.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend);
 
             #region draw end point
             {

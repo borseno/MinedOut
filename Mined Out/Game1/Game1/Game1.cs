@@ -390,7 +390,7 @@ namespace Game1
             Initialize();
         }
 
-        protected void UpdateMainMenu(GameTime gametime)
+        protected void UpdateMainMenu()
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
@@ -401,7 +401,7 @@ namespace Game1
             }
         }
 
-        protected void UpdateEndOfGame(GameTime gametime)
+        protected void UpdateEndOfGame()
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
@@ -413,7 +413,7 @@ namespace Game1
             }
         }
 
-        protected void UpdateGamePlay(GameTime gameTime)
+        protected void UpdateGamePlay()
         {
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
@@ -464,13 +464,13 @@ namespace Game1
             switch (_state)
             {
                 case GameState.MainMenu:
-                    UpdateMainMenu(gameTime);
+                    UpdateMainMenu();
                     break;
                 case GameState.Gameplay:
-                    UpdateGamePlay(gameTime);
+                    UpdateGamePlay();
                     break;
                 case GameState.EndOfGame:
-                    UpdateEndOfGame(gameTime);
+                    UpdateEndOfGame();
                     break;
             }
         }

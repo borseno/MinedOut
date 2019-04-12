@@ -1,4 +1,5 @@
 ﻿using System;
+using logic = Game1.Game.Logic;
 
 namespace Game1
 {
@@ -14,7 +15,7 @@ namespace Game1
         [STAThread]
         static void Main()
         {
-            using (var game = new Game1())
+            using (var game = new logic.Game1())
                 game.Run();
         }
     }

@@ -41,9 +41,21 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Game1.cs" />
-    <Compile Include="KeysInExtension.cs" />
-    <Compile Include="ListExtension.cs" />
+    <Compile Include="Game\Entities\Bomb.cs" />
+    <Compile Include="Game\Entities\DefuseKit.cs" />
+    <Compile Include="Game\Entities\Entity.cs" />
+    <Compile Include="Game\Logic\Game1.cs" />
+    <Compile Include="Game\Logic\GameState.cs" />
+    <Compile Include="Game\Entities\Player.cs" />
+    <Compile Include="Game\Entities\Player_CT.cs" />
+    <Compile Include="HelperClasses\Comparers\EntityToPointComparer.cs" />
+    <Compile Include="HelperClasses\Comparers\InputComparer.cs" />
+    <Compile Include="HelperClasses\Entities_Helpers\EntitiesInitializer.cs" />
+    <Compile Include="HelperClasses\Entities_Helpers\NearbyEntitiesCounter.cs" />
+    <Compile Include="HelperClasses\Extensions\KeysInExtension.cs" />
+    <Compile Include="HelperClasses\Extensions\ListExtension.cs" />
+    <Compile Include="HelperClasses\Restricters\DirectionRestricter.cs" />
+    <Compile Include="HelperClasses\Texture_Helpers\TextureCreator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -61,6 +73,7 @@
     <MonoGameContentReference Include="Content\Content.mgcb" />
     <None Include="app.manifest" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(MSBuildExtensionsPath)\MonoGame\v3.0\MonoGame.Content.Builder.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

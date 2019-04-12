@@ -1,135 +1,24 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Content;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Game1.Game.Entities;
+using Game1.HelperClasses.Comparers;
+using Game1.HelperClasses.Entities_Helpers;
+using Game1.HelperClasses.Extensions;
+using Game1.HelperClasses.Restricters;
+using Game1.HelperClasses.Texture_Helpers;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 
-namespace Game1
+namespace Game1.Game.Logic
 {
-    abstract class Entity : IComparable
-    {
-        public Point Position { get; set; }
-
-        public Entity(int x, int y)
-        {
-            Position = new Point(x, y);
-        }
-
-        public int CompareTo(object i)
-        {
-            if (i is Entity entity)
-            {
-                if (this.Position.X == entity.Position.X)
-                    return this.Position.Y - entity.Position.Y;
-                else
-                    return this.Position.X - entity.Position.X;
-            }
-            else
-            {
-#if DEBUG
-
-                Debug.WriteLine(
-                    $"Error in {this.GetType().Name}.CompareTo({i.GetType().Name}) {Environment.NewLine}" +
-                    $"Invalid cast has been detected");
-
-                throw new InvalidCastException();
-
-#else
-
-                throw new InvalidCastException("Entity is not " + i.GetType().Name);
-                
-#endif
-            }
-        }
-
-        public override string ToString()
-        {
-            return $"{this.GetType()} at {{X = {Position.X} Y = {Position.Y}}}";
-        }
-    }
-
-    class Bomb : Entity
-    {
-        public Bomb(int x, int y) : base(x, y) { }
-    }
-
-    class Player_CT : Player
-    {
-        public bool HasDefuseKit { get; set; }
-
-        public Player_CT(int x, int y) : base(x, y)
-        {
-            HasDefuseKit = false;
-        }
-
-        public void TakeDefuseKit(ref DefuseKit kits)
-        {
-            HasDefuseKit = true;
-            kits = null;
-        }
-    }
-
-    class DefuseKit : Entity
-    {
-        public DefuseKit(int x, int y) : base(x, y)
-        {
-        }
-    }
-
-    abstract class Player : Entity
-    {
-        public Player(int x, int y) : base(x, y)
-        {
-        }
-
-        public bool Move(KeyboardState state, IEnumerable<char> forbidden, int speed)
-        {
-            Keys[] keys = state.GetPressedKeys();
-
-            foreach (Keys key in keys)
-            {
-                if (!forbidden.Contains('w') && (key == Keys.W || key == Keys.Up))
-                {
-                    Position -= new Point(x: 0, y: speed);
-                    return true;
-                }
-                if (!forbidden.Contains('a') && (key == Keys.A || key == Keys.Left))
-                {
-                    Position -= new Point(x: speed, y: 0);
-                    return true;
-                }
-                if (!forbidden.Contains('s') && (key == Keys.S || key == Keys.Down))
-                {
-                    Position += new Point(x: 0, y: speed);
-                    return true;
-                }
-                if (!forbidden.Contains('d') && (key == Keys.D || key == Keys.Right))
-                {
-                    Position += new Point(x: speed, y: 0);
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
-    enum GameState
-    {
-        MainMenu,
-        Gameplay,
-        EndOfGame
-    }
-
-    public class Game1 : Game
+    public class Game1 : Microsoft.Xna.Framework.Game
     {
         const int fontSize = 20;
         const int pointSize = 30;
 
         readonly GraphicsDeviceManager graphics;
-        readonly Random rnd;
         readonly int width;
         readonly int height;
 
@@ -149,6 +38,7 @@ namespace Game1
         Bomb[] bombs;
 
         List<Point> path;
+        Point endPoint;
 
         bool HaveWon => player.Position.X == width / 2 && player.Position.Y == 0;
 
@@ -166,190 +56,22 @@ namespace Game1
             width = graphics.PreferredBackBufferWidth;
             height = graphics.PreferredBackBufferHeight;
 
-            rnd = new Random();
+            endPoint = new Point(width / 2, 0);
 
             Window.Title = "Mined Out";
-        }
-
-        int BombsNearToLinear(int x, int y)
-        {
-            int count = 0;
-
-            for (int i = 0; i < bombs.Length; i++)
-            {
-                if (bombs[i] == null)
-                    continue;
-
-                if (Math.Abs(x - bombs[i].Position.X) <= pointSize &&
-                    Math.Abs(y - bombs[i].Position.Y) <= pointSize &&
-                    (x != bombs[i].Position.X || y != bombs[i].Position.Y))
-                    count++;
-            }
-
-            return count;
-        }
-
-        int BombsNearToBinary(int x, int y)
-        {
-            int count = 0;
-
-            // 8 possible positions of bombs:
-            //         111
-            //         101
-            //         111
-            // where 0 - player, 1 - a bomb.
-
-            // check top 3
-            for (int i = 0; i < 3; i++)
-            {
-                var current = new Point((x - pointSize) + pointSize * i, y - pointSize);
-
-                if (IndexOfBomb(current) >= 0)
-                    count++;
-            }
-
-            // check bottom 3
-            for (int i = 0; i < 3; i++)
-            {
-                var current = new Point((x - pointSize) + pointSize * i, y + pointSize);
-
-                if (IndexOfBomb(current) >= 0)
-                    count++;
-            }
-
-            // check right and left sides of the center
-            var left = new Point(x - pointSize, y);
-            var right = new Point(x + pointSize, y);
-
-            if (IndexOfBomb(left) >= 0)
-                count++;
-
-            if (IndexOfBomb(right) >= 0)
-                count++;
-
-            return count;
-        }
-
-        int BombsNearTo(int x, int y)
-        {
-            if (bombs.Length < 640)
-                return BombsNearToLinear(x, y);
-            else
-                return BombsNearToBinary(x, y);
-        }
-
-        public IEnumerable<char> ForbiddenDirect() // can't move through the walls
-        {
-            var forbidden = new List<char>(4);
-            if (player.Position.X == pointSize)
-                forbidden.Add('a');
-            if (player.Position.Y == pointSize && player.Position.X != width / 2)
-                forbidden.Add('w');
-            if (height - pointSize == player.Position.Y)
-                forbidden.Add('s');
-            if (width - pointSize * 2 == player.Position.X)
-                forbidden.Add('d');
-            return forbidden;
-        }
-
-        private int IndexOfBomb(Point point)
-        {
-            return Array.BinarySearch(bombs, new Bomb(point.X, point.Y));
-        }
-
-        private bool AreKeyboardStatesTheSame(KeyboardState previous, KeyboardState current)
-        {
-            return
-                previous.IsKeyDown(Keys.W) && current.IsKeyDown(Keys.W) ||
-                previous.IsKeyDown(Keys.A) && current.IsKeyDown(Keys.A) ||
-                previous.IsKeyDown(Keys.S) && current.IsKeyDown(Keys.S) ||
-                previous.IsKeyDown(Keys.D) && current.IsKeyDown(Keys.D) ||
-
-                previous.IsKeyDown(Keys.Up) && current.IsKeyDown(Keys.Up) ||
-                previous.IsKeyDown(Keys.Down) && current.IsKeyDown(Keys.Down) ||
-                previous.IsKeyDown(Keys.Left) && current.IsKeyDown(Keys.Left) ||
-                previous.IsKeyDown(Keys.Right) && current.IsKeyDown(Keys.Right);
-        }
-
-        private void InitKits()
-        {
-            kits = new DefuseKit(
-                rnd.Next(1, (width - pointSize) / pointSize) * pointSize,
-                rnd.Next(1, (height - pointSize * 4) / pointSize) * pointSize
-            );
-        }
-
-        private void InitPlayer()
-        {
-            do
-            {
-                player = new Player_CT(
-                        rnd.Next(1, (width - pointSize) / pointSize) * pointSize,
-                        height - pointSize
-                        );
-            } while (player.Position == kits.Position);
-        }
-
-        private void InitBombs()
-        {
-            int min = 100 * 30 / pointSize;
-            int max = 200 * 30 / pointSize;
-
-            int length = rnd.Next(min, max);
-            bombs = new Bomb[length];
-
-            for (int last = 0; last < length;)
-            {
-                int x = (rnd.Next(1, (width - pointSize) / pointSize)) * pointSize;
-                int y = (rnd.Next(1, (height - pointSize) / pointSize)) * pointSize;
-                bool isSpecial = true; // if its coords differ from the other ones'
-
-                for (int i = 0; bombs[i] != null && i < bombs.Length; i++)
-                    if (Math.Abs(bombs[i].Position.X - x) < pointSize && Math.Abs(bombs[i].Position.Y - y) < pointSize)
-                        isSpecial = false;
-
-                if (isSpecial
-                    && (Math.Abs(x - player.Position.X) > pointSize || Math.Abs(y - player.Position.Y) > pointSize)
-                    && (Math.Abs(x - kits.Position.X) >= pointSize || Math.Abs(y - kits.Position.Y) >= pointSize)
-                    && (!(Math.Abs(x - (width / 2)) <= pointSize && y <= pointSize)))
-                {
-                    bombs[last] = new Bomb(x, y);
-                    last++;
-                }
-            }
-
-            Array.Sort(bombs);
         }
 
         private void InitializeEntities()
         {
             // Place kits
-            InitKits();
+            kits = EntitiesInitializer.InitKits(width, height, pointSize);
 
             // Place the player
-            InitPlayer();
+            player = EntitiesInitializer.InitPlayer(width, height, pointSize, kits.Position);
 
             // Create the bombs array
-            InitBombs();
-        }
-
-        public static Texture2D CreateTexture(GraphicsDevice device, int width, int height, Func<int, Color> paint)
-        {
-            //initialize a texture
-            Texture2D texture = new Texture2D(device, width, height);
-
-            //the array holds the color for each pixel in the texture
-            Color[] data = new Color[width * height];
-            for (int pixel = 0; pixel < data.Length; pixel++)
-            {
-                //the function applies the color according to the specified pixel
-                data[pixel] = paint(pixel);
-            }
-
-            //set the color
-            texture.SetData(data);
-
-            return texture;
+            var exceptionsNearNotAllowed = new Point[] {player.Position, kits.Position, endPoint};
+            bombs = EntitiesInitializer.InitBombs(width, height, pointSize, exceptionsNearNotAllowed: exceptionsNearNotAllowed).ToArray();
         }
 
         protected override void Initialize()
@@ -357,7 +79,7 @@ namespace Game1
             path = new List<Point>(84);
             steps = 0;
             cheatMode = false;
-            whiteSquare = CreateTexture(GraphicsDevice, pointSize, pointSize, t => Color.White);
+            whiteSquare = TextureCreator.CreateTexture(GraphicsDevice, pointSize, pointSize, t => Color.White);
 
             InitializeEntities();
 
@@ -429,19 +151,23 @@ namespace Game1
             if (previous == null)
                 previous = Keyboard.GetState();
 
-
-            if (!AreKeyboardStatesTheSame(previous, Keyboard.GetState()))
+            if (!InputComparer.AreKeyboardStatesTheSame(previous, Keyboard.GetState()))
             {
                 var current = Keyboard.GetState();
                 previous = current;
 
-                if (player.Move(current, ForbiddenDirect(), pointSize))
+                if (player.Move(current, 
+                    DirectionRestricter.ForbiddenDirect(player.Position, 
+                        width - pointSize * 2, 
+                        pointSize, pointSize, 
+                        height - pointSize, new Point(width / 2, pointSize)
+                        ), pointSize))
                     steps++;
 
                 if (kits != null && player.Position == kits.Position)
                     player.TakeDefuseKit(ref kits);
 
-                int bombIndex = IndexOfBomb(player.Position);
+                int bombIndex = Array.BinarySearch(bombs, player);
 
                 if (bombIndex >= 0)
                 {
@@ -461,6 +187,7 @@ namespace Game1
         protected override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
+
             switch (_state)
             {
                 case GameState.MainMenu:
@@ -509,7 +236,7 @@ namespace Game1
 
         protected void DrawGamePlay()
         {
-            var bombsNear = BombsNearTo(player.Position.X, player.Position.Y);
+            var bombsNear = NearbyEntitiesCounter.EntitiesNearToEntity(bombs, player, pointSize);
             var endPoint = new Vector2(width / 2, 0);
 
             GraphicsDevice.Clear(Color.Black);

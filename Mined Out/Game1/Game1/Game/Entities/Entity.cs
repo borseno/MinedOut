@@ -43,6 +43,14 @@ namespace Game1.Game.Entities
             }
         }
 
+        public override bool Equals(object obj)
+        {
+            if (obj is Entity ent)
+                return Position.Equals(ent.Position);
+
+            return false;
+        }
+
         public override string ToString()
         {
             return $"{this.GetType()} at {{X = {Position.X} Y = {Position.Y}}}";

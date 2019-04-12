@@ -8,11 +8,5 @@
         {
             HasDefuseKit = false;
         }
-
-        public void TakeDefuseKit(ref DefuseKit kits)
-        {
-            HasDefuseKit = true;
-            kits = null;
-        }
     }
 }

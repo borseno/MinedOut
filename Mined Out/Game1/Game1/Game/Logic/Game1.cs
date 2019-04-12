@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Game1.Game.Entities;
 using Game1.HelperClasses.Comparers;
 using Game1.HelperClasses.Entities_Helpers;
@@ -51,7 +53,7 @@ namespace Game1.Game.Logic
             };
 
             Content.RootDirectory = "Content";
-            TargetElapsedTime = new TimeSpan(0, 0, 0, 0, 12);
+            TargetElapsedTime = new TimeSpan(0, 0, 0, 0, 3);
 
             width = graphics.PreferredBackBufferWidth;
             height = graphics.PreferredBackBufferHeight;
@@ -70,7 +72,7 @@ namespace Game1.Game.Logic
             player = EntitiesInitializer.InitPlayer(width, height, pointSize, kits.Position);
 
             // Create the bombs array
-            var exceptionsNearNotAllowed = new Point[] {player.Position, kits.Position, endPoint};
+            var exceptionsNearNotAllowed = new Point[] { player.Position, kits.Position, endPoint };
             bombs = EntitiesInitializer.InitBombs(width, height, pointSize, exceptionsNearNotAllowed: exceptionsNearNotAllowed).ToArray();
         }
 
@@ -137,10 +139,12 @@ namespace Game1.Game.Logic
 
         protected void UpdateGamePlay()
         {
-            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+            var current = Keyboard.GetState();
+
+            if (current.IsKeyDown(Keys.Escape))
                 Exit();
 
-            if (Keyboard.GetState().IsKeyDown(Keys.C)) // Easter Egg =D
+            if (current.IsKeyDown(Keys.C)) // Easter Egg =D
                 cheatMode = true;
             else
                 cheatMode = false;
@@ -149,25 +153,27 @@ namespace Game1.Game.Logic
                 path.Add(player.Position);
 
             if (previous == null)
-                previous = Keyboard.GetState();
-
-            if (!InputComparer.AreKeyboardStatesTheSame(previous, Keyboard.GetState()))
-            {
-                var current = Keyboard.GetState();
                 previous = current;
 
-                if (player.Move(current, 
-                    DirectionRestricter.ForbiddenDirect(player.Position, 
-                        width - pointSize * 2, 
-                        pointSize, pointSize, 
-                        height - pointSize, new Point(width / 2, pointSize)
-                        ), pointSize))
+            if (!InputComparer.AreKeyboardStatesTheSame(previous, current))
+            {
+                previous = current;
+
+                if (player.Move(current,
+                    DirectionRestricter.ForbiddenDirect(player.Position,
+                        width - pointSize * 2,
+                        pointSize, pointSize,
+                        height - pointSize, endPoint + new Point(0, pointSize)
+                    ), pointSize))
                     steps++;
 
                 if (kits != null && player.Position == kits.Position)
-                    player.TakeDefuseKit(ref kits);
+                {
+                    player.HasDefuseKit = true;
+                    kits = null;
+                }
 
-                int bombIndex = Array.BinarySearch(bombs, player);
+                int bombIndex = Array.IndexOf<Entity>(bombs, player);
 
                 if (bombIndex >= 0)
                 {
@@ -179,8 +185,10 @@ namespace Game1.Game.Logic
                     bombs[bombIndex] = null;
                     player.HasDefuseKit = false;
                 }
+
                 if (HaveWon) // won
                     _state = GameState.EndOfGame;
+
             }
         }
 
@@ -237,14 +245,14 @@ namespace Game1.Game.Logic
         protected void DrawGamePlay()
         {
             var bombsNear = NearbyEntitiesCounter.EntitiesNearToEntity(bombs, player, pointSize);
-            var endPoint = new Vector2(width / 2, 0);
+            //var endPoint = new Vector2(width / 2, 0);
 
             GraphicsDevice.Clear(Color.Black);
             sprite.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend);
 
             #region draw end point
             {
-                sprite.Draw(whiteSquare, endPoint,
+                sprite.Draw(whiteSquare, new Vector2(endPoint.X, endPoint.Y),
                     null, Color.Orange, 0, Vector2.Zero, 1, SpriteEffects.None, 1);
             }
             #endregion
@@ -321,8 +329,8 @@ namespace Game1.Game.Logic
                 var moreLeftRightTop = new Vector2(rightTop.X - (bombsText.Length * 1.0f) * fontSize, rightTop.Y);
                 var moreRightLeftTop = new Vector2(leftTop.X + (stepsText.Length * 1.3f) * fontSize, leftTop.Y);
 
-                var distanceX = Math.Abs((player.Position.X - endPoint.X) / 30);
-                var distanceY = Math.Abs((player.Position.Y - endPoint.Y) / 30);
+                var distanceX = Math.Abs((player.Position.X - endPoint.X) / pointSize);
+                var distanceY = Math.Abs((player.Position.Y - endPoint.Y) / pointSize);
 
                 var distance = distanceX + distanceY;
 
@@ -332,7 +340,7 @@ namespace Game1.Game.Logic
                 // bombs nearby
                 sprite.DrawString(font, $"{bombsText} {bombsNear}", moreLeftRightTop, Color.CadetBlue);
 
-                sprite.DrawString(font, $"{distanceEndText} {Math.Round(distance)} ", moreRightLeftTop, Color.CadetBlue);
+                sprite.DrawString(font, $"{distanceEndText} {distance} ", moreRightLeftTop, Color.CadetBlue);
             }
             #endregion
 
